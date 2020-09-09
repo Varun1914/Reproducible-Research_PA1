@@ -1,0 +1,117 @@
+Personal Activity Monitoring Analysis 
+======================================
+Author: Paul Vinod
+
+This is a study to analyze the various activities of personal activity montioring device. The study comprises of implementing the following tasks on the imported data from vaious devices like Nike Fuelband, Jawbone Up and Fitbit. 
+
+Adding global options
+```{r Global options}
+knitr::opts_chunk$set(fig.cap = "...",
+                      warning = FALSE, 
+                      message = FALSE,
+                      echo    = TRUE,
+                      cache   = FALSE)
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+
+```
+
+**Step 1: Reading data from URL Link**
+```{r Reading data}
+filename = "CourseProject5_1.zip"
+if(!file.exists(filename))
+{
+    fileUrl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+    download.file(fileUrl,
+                  destfile = filename,
+                  method = "curl")
+
+}
+
+unzip(filename)
+```
+
+**Step 2: Storing the dataset in variable**
+```{r Data Variable }
+fit_data <- read.csv("activity.csv", 
+                     header = TRUE, 
+                    )
+fit_data$date <- date(fit_data$date)
+summary(fit_data)
+```
+
+**Step 3: Histogram Plotting for steps per day**
+```{r histogram plotting}
+steps_by_date <- fit_data %>%
+                    group_by(date) %>%
+                        summarise(sum_steps = sum(steps, na.rm = TRUE))
+hist(steps_by_date$sum_steps,
+     main = "Histogram on Steps per Days",
+     xlab = "steps per day",
+     breaks = seq(0,25000, by = 1000),
+     col = "green")
+```
+
+**Step 4: Mean and Median of data**
+```{r mean and median}
+summarise_at(steps_by_date, .vars = "sum_steps", .funs = c("mean","median"))
+```
+
+**Step 5: Time series average number of steps**
+```{r}
+steps_by_interval <- with(fit_data, 
+                          aggregate( fit_data$steps, 
+                                     by = list(fit_data$interval), mean,
+                                     na.rm = TRUE))
+
+with(steps_by_interval, plot(x = Group.1, y = x, 
+                             type = "l",
+                             xlab = "interval",
+                             ylab = "Steps in each Interval",
+                             main = "Time series plot of the average number of steps",
+                             col = "red"))
+```
+
+**Step 6: Finding the interval with max steps**
+```{r}
+steps_by_interval[which.max(steps_by_interval$x),]$Group.1
+```
+
+**Step 7: Inputting the missing data**
+The number of missing values in the data set. 
+```{r}
+sum(is.na(fit_data$steps))
+```
+Adding the mean values of the corresponding interval to fill the NA values. 
+*Functions used: match & transorm*
+```{r}
+impute_values <- steps_by_interval$x[match(fit_data$interval, steps_by_interval$Group.1)]
+new_data <- transform(fit_data, steps = ifelse(is.na(fit_data$steps),
+                                     yes = impute_values,
+                                     no = steps))
+```
+**Step 8: Histogram plotting**
+```{r}
+steps_new_data <- new_data %>% group_by(date) %>% summarise(sum = sum(steps))
+hist(steps_new_data$sum, 
+     xlab = "Steps per day",
+     main = "Histogram of steps per day",
+     col  = "lightblue",
+     breaks = seq(0,25000, by = 1000))
+```
+
+**Step 9: Panel plot of average steps in weekend and weekdays**
+```{r}
+new_data <- transform(new_data, weekday = weekdays(new_data$date))
+new_data <- transform(new_data, weekday = ifelse(new_data$weekday %in% c("Saturday","Sunday"),
+                                                 "Weekend", "Weekday"))
+new_data <- new_data %>% group_by(interval, weekday) %>% summarise(average = mean(steps))
+g <- ggplot(new_data, aes(x = interval, y = average, color = weekday)) +
+    geom_line() +
+    labs(title = "Panel Plot of Weekday and Weekend", x = "interval", y = "Average Steps") +
+    facet_wrap(weekday~.)
+print(g)
+```
+
+This was the various project description and plots for the fitness data set. 
